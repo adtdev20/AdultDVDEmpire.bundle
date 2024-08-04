@@ -63,11 +63,14 @@ class ADEAgent(Agent.Movies):
     if DEBUG: Log('Search Query: %s' % str(ADE_SEARCH_MOVIES % query))
     # Finds the entire media enclosure <DIV> elements then steps through them
     for movie in HTML.ElementFromURL(ADE_SEARCH_MOVIES % query).xpath('//div[contains(@class,"row list-view-item")]'):
+      # Uncomment below to get all the div tag results for the variable movie
+      # if DEBUG: Log('Search Result for variable movie: %s' % str(movie))
       # curName = The text in the 'title' p
       try:
         moviehref = movie.xpath('.//a[contains(@label,"Title")]')[0]
         curName = moviehref.text_content().strip()
-        #if DEBUG: Log('Initial Result Name found: %s' % str(curName))
+        # Uncomment below to get the debug logging for the initial name result
+        if DEBUG: Log('Initial Result Name found: %s' % str(curName))
         if curName.count(', The'):
           curName = 'The ' + curName.replace(', The','',1)
         yearName = curName
@@ -91,7 +94,10 @@ class ADEAgent(Agent.Movies):
         # Parse out the "Production Year" and use that for identification since release date is usually different
         # between formats.  Also the Try: block is because not all releases have Production Year associated
         try:
-          curYear = movie.xpath('.//a[@label="Title"]/following-sibling::small')[0].text_content().strip()
+          # Existing Production year code
+          # curYear = movie.xpath('.//a[@label="Title"]/following-sibling::small')[0].text_content().strip()
+          # New Production Year Code
+          curYear = movie.xpath('.//a[contains(@aria-label, "View")]/following-sibling::text()[1]')[0].strip()
           if len(curYear):
             if not re.match(r"\(\d\d\d\d\)",curYear):
               curYear = None
@@ -100,20 +106,24 @@ class ADEAgent(Agent.Movies):
         except: pass
 
         if preference['searchtype'] == 'all':
+          if DEBUG: Log('Checking the category for VOD or DVD')
           #If the category is VOD then lower the score by half to place it lower than DVD results
           #movie2 = movie.xpath('//small[contains(text(),"DVD-Video") or contains(text(),"Video On Demand") or contains(text(),"Blu-ray")]')
-          movie2 = movie.xpath('.//small[contains(text(),"DVD-Video")]')
+          movie2 = movie.xpath('.//a[@title="DVD" or @title="dvd"]')
+          if DEBUG: Log('Current title is DVD')
           if len(movie2) > 0:
             mediaformat = "dvd"
 
-          movie2 = movie.xpath('.//small[contains(text(),"Blu-ray")]')
-          if len(movie2) > 0:
-            mediaformat = "br"
+          # Commenting out Blu-Ray checking for now
+          # movie2 = movie.xpath('.//a[@title="DVD" and @label="Blu-ray"]')
+          # if DEBUG: Log('Current title is Blu-Ray')
+          # if len(movie2) > 0:
+          #   mediaformat = "br"
 
-          movie2 = movie.xpath('.//small[contains(text(),"Video On Demand")]')
+          movie2 = movie.xpath('.//a[@title="VOD" or @title="vod"]')
+          if DEBUG: Log('Current title is VOD')
           if len(movie2) > 0:
             mediaformat = "vod"
-
         else:
             mediaformat = 'NA'
 
@@ -195,16 +205,17 @@ class ADEAgent(Agent.Movies):
       thumb = HTTP.Request(thumbUrl)
       posterUrl = img.get('src')
       metadata.posters[posterUrl] = Proxy.Preview(thumb)
-    except: pass
+    except Exception, e:
+      Log('Got an exception while downloading posters %s' %str(e))
 
     # Tagline
-    try: metadata.tagline = html.xpath('//p[@class="Tagline"]')[0].text_content().strip()
+    try: metadata.tagline = html.xpath('//h2[contains(@class, "test")]/text()')[0].strip()
     except: pass
 
     # Summary.
     try:
-        summary = html.xpath('//div[@class="col-xs-12 text-center p-y-2 bg-lightgrey"]/div/p')[0].text_content().strip()
-        summary = re.sub('<[^<]+?>', '', summary)
+        summary = html.xpath('//div[@class="synopsis-content"]/p')[0].text_content().strip()
+        #summary = re.sub('<[^<]+?>', '', summary)
         Log('Summary Found: %s' %str(summary))
         metadata.summary = summary
     except Exception, e:
